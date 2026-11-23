@@ -278,6 +278,24 @@ func (r *MessageRepository) ListPendingForSend(ctx context.Context, instanceID u
 	return messages, nil
 }
 
+func (r *MessageRepository) ListInstancesWithPendingSend(ctx context.Context) ([]uuid.UUID, error) {
+	rows, err := r.db.Query(ctx,
+		`SELECT DISTINCT instance_id FROM catwire.messages WHERE status = 'pending' AND direction = 'outbound'`,
+	)
+	if err != nil {
+		return nil, wrapError("list instances with pending messages", err)
+	}
+	ids, err := collect(rows, func(row scanner) (uuid.UUID, error) {
+		var id uuid.UUID
+		err := row.Scan(&id)
+		return id, err
+	})
+	if err != nil {
+		return nil, wrapError("list instances with pending messages", err)
+	}
+	return ids, nil
+}
+
 func (r *MessageRepository) ScheduleSendRetry(ctx context.Context, instanceID, id uuid.UUID, nextAttemptAt time.Time) error {
 	tag, err := r.db.Exec(ctx,
 		`UPDATE catwire.messages
