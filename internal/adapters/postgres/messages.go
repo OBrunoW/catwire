@@ -383,3 +383,41 @@ func (r *MessageRepository) ApplyReaction(
 	}
 	return tag.RowsAffected() == 1, nil
 }
+
+func (r *MessageRepository) FindReplyTargets(
+	ctx context.Context,
+	instanceID uuid.UUID,
+	references []domain.MessageRef,
+) (map[domain.MessageRef]uuid.UUID, error) {
+	chatIDs := make([]uuid.UUID, 0, len(references))
+	waMessageIDs := make([]string, 0, len(references))
+	for _, reference := range references {
+		chatIDs = append(chatIDs, reference.ChatID)
+		waMessageIDs = append(waMessageIDs, reference.WAMessageID)
+	}
+	rows, err := r.db.Query(ctx,
+		`SELECT m.chat_id, m.wa_message_id, m.id
+		FROM catwire.messages m
+		JOIN unnest($2::uuid[], $3::text[]) AS wanted(chat_id, wa_message_id)
+			ON m.chat_id = wanted.chat_id AND m.wa_message_id = wanted.wa_message_id
+		WHERE m.instance_id = $1`,
+		instanceID, chatIDs, waMessageIDs,
+	)
+	if err != nil {
+		return nil, wrapError("find reply targets", err)
+	}
+	defer rows.Close()
+	targets := make(map[domain.MessageRef]uuid.UUID, len(references))
+	for rows.Next() {
+		var reference domain.MessageRef
+		var id uuid.UUID
+		if err := rows.Scan(&reference.ChatID, &reference.WAMessageID, &id); err != nil {
+			return nil, wrapError("find reply targets", err)
+		}
+		targets[reference] = id
+	}
+	if err := rows.Err(); err != nil {
+		return nil, wrapError("find reply targets", err)
+	}
+	return targets, nil
+}

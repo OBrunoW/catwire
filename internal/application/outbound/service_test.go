@@ -288,6 +288,36 @@ func TestUnregisteredRecipientIsCachedBriefly(t *testing.T) {
 	}
 }
 
+func TestCheckRecipientSharesCacheWithSendAndDoesNotFailOnMissingAccount(t *testing.T) {
+	h := newHarness(t, domain.InstanceStatusConnected)
+	instanceID := h.instance.ID
+
+	missing, err := h.service.CheckRecipient(context.Background(), instanceID, "5511977776666")
+	if err != nil || missing.Exists {
+		t.Fatalf("expected a registration without account, got %+v %v", missing, err)
+	}
+	found, err := h.service.CheckRecipient(context.Background(), instanceID, "5511988887777")
+	if err != nil || !found.Exists {
+		t.Fatalf("expected registered recipient, got %+v %v", found, err)
+	}
+	if _, err := h.send("", textRequest("5511988887777", "hello")); err != nil {
+		t.Fatal(err)
+	}
+	if len(h.gateway.lookups) != 2 {
+		t.Fatalf("expected the send to reuse the cached lookup, got %v", h.gateway.lookups)
+	}
+}
+
+func TestCheckRecipientRejectsMalformedPhone(t *testing.T) {
+	h := newHarness(t, domain.InstanceStatusConnected)
+
+	_, err := h.service.CheckRecipient(context.Background(), h.instance.ID, "12ab")
+
+	if appErr, ok := domain.AsAppError(err); !ok || appErr.Status != 400 {
+		t.Fatalf("expected 400, got %v", err)
+	}
+}
+
 func TestIdempotencySameBodyReturnsExistingMessage(t *testing.T) {
 	h := newHarness(t, domain.InstanceStatusConnected)
 	first, err := h.send("key-1", textRequest("5511988887777", "hello"))

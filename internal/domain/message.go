@@ -92,3 +92,8 @@ type Reaction struct {
 	Emoji     string    `json:"emoji"`
 	ReactedAt time.Time `json:"reacted_at"`
 }
+
+type MessageRef struct {
+	ChatID      uuid.UUID
+	WAMessageID string
+}

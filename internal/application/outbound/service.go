@@ -287,19 +287,34 @@ func isChatNotFound(err error) bool {
 }
 
 func (s *Service) lookupRecipient(ctx context.Context, instanceID uuid.UUID, phone string) (Registration, error) {
-	registration, cached := s.recipients.get(phone)
-	if !cached {
-		found, err := s.gateway.IsOnWhatsApp(ctx, instanceID, phone)
-		if err != nil {
-			return Registration{}, mapGatewayError(err, "could not check the recipient on whatsapp")
-		}
-		registration = found
-		s.recipients.put(phone, registration)
+	registration, err := s.cachedRegistration(ctx, instanceID, phone)
+	if err != nil {
+		return Registration{}, err
 	}
 	if !registration.Exists {
 		return Registration{}, domain.RecipientNotOnWhatsApp()
 	}
 	return registration, nil
+}
+
+func (s *Service) CheckRecipient(ctx context.Context, instanceID uuid.UUID, phone string) (Registration, error) {
+	if !validPhone(phone) {
+		return Registration{}, domain.BadRequest("phone must be digits with country code")
+	}
+	return s.cachedRegistration(ctx, instanceID, phone)
+}
+
+func (s *Service) cachedRegistration(ctx context.Context, instanceID uuid.UUID, phone string) (Registration, error) {
+	registration, cached := s.recipients.get(phone)
+	if cached {
+		return registration, nil
+	}
+	found, err := s.gateway.IsOnWhatsApp(ctx, instanceID, phone)
+	if err != nil {
+		return Registration{}, mapGatewayError(err, "could not check the recipient on whatsapp")
+	}
+	s.recipients.put(phone, found)
+	return found, nil
 }
 
 func mapGatewayError(err error, message string) error {

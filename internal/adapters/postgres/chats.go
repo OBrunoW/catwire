@@ -199,3 +199,27 @@ func (r *ChatRepository) TouchLastMessage(ctx context.Context, instanceID, id, m
 	}
 	return nil
 }
+
+func (r *ChatRepository) FindJIDsByIDs(ctx context.Context, instanceID uuid.UUID, ids []uuid.UUID) (map[uuid.UUID]string, error) {
+	rows, err := r.db.Query(ctx,
+		`SELECT id, jid FROM catwire.chats WHERE instance_id = $1 AND id = ANY($2)`,
+		instanceID, orEmptyUUIDs(ids),
+	)
+	if err != nil {
+		return nil, wrapError("find chat jids", err)
+	}
+	defer rows.Close()
+	jids := make(map[uuid.UUID]string, len(ids))
+	for rows.Next() {
+		var id uuid.UUID
+		var jid string
+		if err := rows.Scan(&id, &jid); err != nil {
+			return nil, wrapError("find chat jids", err)
+		}
+		jids[id] = jid
+	}
+	if err := rows.Err(); err != nil {
+		return nil, wrapError("find chat jids", err)
+	}
+	return jids, nil
+}
