@@ -1,10 +1,13 @@
 package domain
 
 import (
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
 )
+
+var ErrChatIdentityConflict = errors.New("postgres: chat jid or lid already belongs to another chat")
 
 const (
 	ChatTypeDirect = "direct"

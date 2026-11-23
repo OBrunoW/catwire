@@ -14,13 +14,14 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	apihttp "github.com/OBrunoW/catwire/internal/adapters/http"
+	"github.com/OBrunoW/catwire/internal/domain"
 )
 
 const uniqueViolationCode = "23505"
 
 var (
 	ErrIdempotencyKeyTaken  = errors.New("postgres: idempotency key already used in this instance")
-	ErrChatIdentityConflict = errors.New("postgres: chat jid or lid already belongs to another chat")
+	ErrChatIdentityConflict = domain.ErrChatIdentityConflict
 )
 
 type DBTX interface {
