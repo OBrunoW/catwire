@@ -1,6 +1,8 @@
 package kafka
 
 import (
+	"context"
+	"net"
 	"testing"
 
 	"github.com/OBrunoW/catwire/internal/application/outbox"
@@ -19,5 +21,38 @@ func TestToKafkaMessageMapsTopicKeyValueAndHeaders(t *testing.T) {
 	}
 	if len(message.Headers) != 2 || message.Headers[0].Key != "event_id" || string(message.Headers[1].Value) != "i1" {
 		t.Fatalf("unexpected headers: %+v", message.Headers)
+	}
+}
+
+func TestPingSucceedsWhenAnyBrokerAcceptsConnections(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	closed, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	deadAddress := closed.Addr().String()
+	closed.Close()
+
+	publisher := NewPublisher([]string{deadAddress, listener.Addr().String()})
+	if err := publisher.Ping(context.Background()); err != nil {
+		t.Fatalf("expected ping to succeed: %v", err)
+	}
+}
+
+func TestPingFailsWhenNoBrokerIsReachable(t *testing.T) {
+	closed, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	deadAddress := closed.Addr().String()
+	closed.Close()
+
+	publisher := NewPublisher([]string{deadAddress})
+	if err := publisher.Ping(context.Background()); err == nil {
+		t.Fatal("expected ping to fail")
 	}
 }
