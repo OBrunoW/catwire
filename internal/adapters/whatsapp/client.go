@@ -22,10 +22,11 @@ const (
 type Factory struct {
 	container *sqlstore.Container
 	logger    waLog.Logger
+	ingestor  Ingestor
 }
 
-func NewFactory(store *Store, logger waLog.Logger) *Factory {
-	return &Factory{container: store.container, logger: logger}
+func NewFactory(store *Store, logger waLog.Logger, ingestor Ingestor) *Factory {
+	return &Factory{container: store.container, logger: logger, ingestor: ingestor}
 }
 
 func (f *Factory) Create(ctx context.Context, instance domain.Instance, emit func(session.Event)) (session.Client, error) {
@@ -39,6 +40,10 @@ func (f *Factory) Create(ctx context.Context, instance domain.Instance, emit fun
 			emit(translated)
 		}
 	})
+	if f.ingestor != nil {
+		handler := newMessageHandler(context.WithoutCancel(ctx), f.ingestor, instance, raw.Store.LIDs, raw, f.logger)
+		raw.AddEventHandler(handler.handle)
+	}
 	return &client{raw: raw}, nil
 }
 
