@@ -145,12 +145,26 @@ func (r *MediaRepository) MarkStored(ctx context.Context, id uuid.UUID, stored d
 			sha256 = $6, width = COALESCE($7, width), height = COALESCE($8, height),
 			duration_seconds = COALESCE($9, duration_seconds), stored_at = now(), next_attempt_at = NULL,
 			last_error = NULL
-		WHERE id = $1`,
+		WHERE id = $1 AND status = 'pending'`,
 		id, stored.StorageBackend, stored.StorageKey, stored.MimeType, stored.SizeBytes, stored.SHA256,
 		stored.Width, stored.Height, stored.DurationSeconds,
 	)
 	if err != nil {
 		return wrapError("mark media stored", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.MediaNotFound()
+	}
+	return nil
+}
+
+func (r *MediaRepository) Reschedule(ctx context.Context, id uuid.UUID, nextAttemptAt time.Time) error {
+	tag, err := r.db.Exec(ctx,
+		`UPDATE catwire.media SET next_attempt_at = $2 WHERE id = $1 AND status = 'pending'`,
+		id, nextAttemptAt,
+	)
+	if err != nil {
+		return wrapError("reschedule media", err)
 	}
 	if tag.RowsAffected() == 0 {
 		return domain.MediaNotFound()
@@ -175,6 +189,22 @@ func (r *MediaRepository) RecordDownloadFailure(
 	)
 	if err != nil {
 		return wrapError("record media download failure", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.MediaNotFound()
+	}
+	return nil
+}
+
+func (r *MediaRepository) ApplyRetryPath(ctx context.Context, id uuid.UUID, directPath string) error {
+	tag, err := r.db.Exec(ctx,
+		`UPDATE catwire.media
+		SET wa_direct_path = $2, next_attempt_at = now(), last_error = NULL
+		WHERE id = $1 AND status = 'pending'`,
+		id, directPath,
+	)
+	if err != nil {
+		return wrapError("apply media retry path", err)
 	}
 	if tag.RowsAffected() == 0 {
 		return domain.MediaNotFound()

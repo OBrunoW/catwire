@@ -146,3 +146,29 @@ func TestMediaRecordDownloadFailure(t *testing.T) {
 		})
 	}
 }
+
+func TestMediaApplyRetryPathReschedulesPendingMedia(t *testing.T) {
+	pool := newTestPool(t)
+	repository := postgres.NewMediaRepository(pool)
+	instance := newInstance(t, pool, uniqueClientID())
+	pending := insertMedia(t, pool, instance.ID, domain.MediaStatusPending, nil)
+	failed := insertMedia(t, pool, instance.ID, domain.MediaStatusFailed, nil)
+	ctx := context.Background()
+	requireNoError(t, repository.RecordDownloadFailure(ctx, pending.ID, "media retry requested from phone", ptrTime(time.Now().Add(time.Hour))))
+
+	requireNoError(t, repository.ApplyRetryPath(ctx, pending.ID, "/v/t62/fresh"))
+
+	updated, err := repository.FindByIDUnscoped(ctx, pending.ID)
+	requireNoError(t, err)
+	if updated.WADirectPath == nil || *updated.WADirectPath != "/v/t62/fresh" || updated.LastError != nil {
+		t.Fatalf("unexpected media %+v", updated)
+	}
+	if updated.NextAttemptAt == nil || updated.NextAttemptAt.After(time.Now().Add(time.Minute)) {
+		t.Fatalf("next attempt not reset: %v", updated.NextAttemptAt)
+	}
+	requireAppError(t, repository.ApplyRetryPath(ctx, failed.ID, "/v/t62/other"), domain.MediaNotFound())
+}
+
+func ptrTime(value time.Time) *time.Time {
+	return &value
+}
