@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/google/uuid"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/store"
 	"go.mau.fi/whatsmeow/store/sqlstore"
@@ -23,10 +24,18 @@ type Factory struct {
 	container *sqlstore.Container
 	logger    waLog.Logger
 	ingestor  Ingestor
+	registry  *ClientRegistry
+	retries   MediaRetryHandler
 }
 
 func NewFactory(store *Store, logger waLog.Logger, ingestor Ingestor) *Factory {
 	return &Factory{container: store.container, logger: logger, ingestor: ingestor}
+}
+
+func (f *Factory) WithMedia(registry *ClientRegistry, retries MediaRetryHandler) *Factory {
+	f.registry = registry
+	f.retries = retries
+	return f
 }
 
 func (f *Factory) Create(ctx context.Context, instance domain.Instance, emit func(session.Event)) (session.Client, error) {
@@ -42,9 +51,13 @@ func (f *Factory) Create(ctx context.Context, instance domain.Instance, emit fun
 	})
 	if f.ingestor != nil {
 		handler := newMessageHandler(context.WithoutCancel(ctx), f.ingestor, instance, raw.Store.LIDs, raw, f.logger)
+		handler.retries = f.retries
 		raw.AddEventHandler(handler.handle)
 	}
-	return &client{raw: raw}, nil
+	if f.registry != nil {
+		f.registry.set(instance.ID, raw)
+	}
+	return &client{raw: raw, instanceID: instance.ID, registry: f.registry}, nil
 }
 
 func (f *Factory) loadDevice(ctx context.Context, instance domain.Instance) (*store.Device, error) {
@@ -66,7 +79,9 @@ func (f *Factory) loadDevice(ctx context.Context, instance domain.Instance) (*st
 }
 
 type client struct {
-	raw *whatsmeow.Client
+	raw        *whatsmeow.Client
+	instanceID uuid.UUID
+	registry   *ClientRegistry
 }
 
 func (c *client) Connect() error {
@@ -98,6 +113,9 @@ func (c *client) PairPhone(ctx context.Context, phone string) (string, error) {
 }
 
 func (c *client) Release() {
+	if c.registry != nil {
+		c.registry.remove(c.instanceID, c.raw)
+	}
 	c.raw.RemoveEventHandlers()
 	c.raw.Disconnect()
 }

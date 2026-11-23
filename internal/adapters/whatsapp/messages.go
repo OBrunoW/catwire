@@ -36,6 +36,7 @@ type messageHandler struct {
 	lids     lidResolver
 	parser   webMessageParser
 	logger   waLog.Logger
+	retries  MediaRetryHandler
 }
 
 func newMessageHandler(
@@ -60,6 +61,8 @@ func (h *messageHandler) handle(raw any) {
 		err = h.handleReceipt(event)
 	case *events.HistorySync:
 		err = h.handleHistory(event)
+	case *events.MediaRetry:
+		err = h.handleMediaRetry(event)
 	}
 	if err != nil {
 		h.logger.Errorf("ingest event for instance %s failed: %v", h.instance.ID, err)

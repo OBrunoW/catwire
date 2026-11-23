@@ -28,64 +28,43 @@ type SenderResource struct {
 	PushName *string `json:"push_name"`
 }
 
-type MediaResource struct {
-	ID                   uuid.UUID  `json:"id"`
-	Kind                 string     `json:"kind"`
-	Status               string     `json:"status"`
-	MimeType             *string    `json:"mime_type"`
-	FileName             *string    `json:"file_name"`
-	SizeBytes            *int64     `json:"size_bytes"`
-	SHA256               *string    `json:"sha256"`
-	Width                *int       `json:"width"`
-	Height               *int       `json:"height"`
-	DurationSeconds      *int       `json:"duration_seconds"`
-	IsVoiceNote          bool       `json:"is_voice_note"`
-	DownloadURL          *string    `json:"download_url"`
-	DownloadURLExpiresAt *time.Time `json:"download_url_expires_at"`
-}
-
 type ReplyToResource struct {
 	WAMessageID string     `json:"wa_message_id"`
 	MessageID   *uuid.UUID `json:"message_id"`
 }
 
-type ErrorResource struct {
-	Code    string `json:"code"`
-	Message string `json:"message"`
-}
-
 type MessageResource struct {
-	ID          uuid.UUID        `json:"id"`
-	InstanceID  uuid.UUID        `json:"instance_id"`
-	ChatID      uuid.UUID        `json:"chat_id"`
-	ChatJID     string           `json:"chat_jid"`
-	WAMessageID string           `json:"wa_message_id"`
-	Direction   string           `json:"direction"`
-	Origin      string           `json:"origin"`
-	Source      string           `json:"source"`
-	Sender      SenderResource   `json:"sender"`
-	Type        string           `json:"type"`
-	Text        *string          `json:"text"`
-	Media       *MediaResource   `json:"media"`
-	Location    json.RawMessage  `json:"location"`
-	Contacts    json.RawMessage  `json:"contacts"`
-	ReplyTo     *ReplyToResource `json:"reply_to"`
-	IsForwarded bool             `json:"is_forwarded"`
-	IsEphemeral bool             `json:"is_ephemeral"`
-	IsViewOnce  bool             `json:"is_view_once"`
-	Status      string           `json:"status"`
-	Error       *ErrorResource   `json:"error"`
-	Reactions   json.RawMessage  `json:"reactions"`
-	Metadata    json.RawMessage  `json:"metadata"`
-	Timestamp   time.Time        `json:"timestamp"`
-	SentAt      *time.Time       `json:"sent_at"`
-	DeliveredAt *time.Time       `json:"delivered_at"`
-	ReadAt      *time.Time       `json:"read_at"`
-	PlayedAt    *time.Time       `json:"played_at"`
-	EditedAt    *time.Time       `json:"edited_at"`
-	RevokedAt   *time.Time       `json:"revoked_at"`
-	CreatedAt   time.Time        `json:"created_at"`
-	UpdatedAt   time.Time        `json:"updated_at"`
+	ID          uuid.UUID             `json:"id"`
+	InstanceID  uuid.UUID             `json:"instance_id"`
+	ChatID      uuid.UUID             `json:"chat_id"`
+	ChatJID     string                `json:"chat_jid"`
+	WAMessageID string                `json:"wa_message_id"`
+	Direction   string                `json:"direction"`
+	Origin      string                `json:"origin"`
+	Source      string                `json:"source"`
+	Sender      SenderResource        `json:"sender"`
+	Type        string                `json:"type"`
+	Text        *string               `json:"text"`
+	Media       *domain.MediaResource `json:"media"`
+	Location    json.RawMessage       `json:"location"`
+	Contacts    json.RawMessage       `json:"contacts"`
+	ReplyTo     *ReplyToResource      `json:"reply_to"`
+	IsForwarded bool                  `json:"is_forwarded"`
+	IsEphemeral bool                  `json:"is_ephemeral"`
+	IsViewOnce  bool                  `json:"is_view_once"`
+	Status      string                `json:"status"`
+	Error       *domain.ErrorResource `json:"error"`
+	Reactions   json.RawMessage       `json:"reactions"`
+	Metadata    json.RawMessage       `json:"metadata"`
+	Timestamp   time.Time             `json:"timestamp"`
+	SentAt      *time.Time            `json:"sent_at"`
+	DeliveredAt *time.Time            `json:"delivered_at"`
+	ReadAt      *time.Time            `json:"read_at"`
+	PlayedAt    *time.Time            `json:"played_at"`
+	EditedAt    *time.Time            `json:"edited_at"`
+	RevokedAt   *time.Time            `json:"revoked_at"`
+	CreatedAt   time.Time             `json:"created_at"`
+	UpdatedAt   time.Time             `json:"updated_at"`
 }
 
 type MessageEventData struct {
@@ -179,11 +158,11 @@ func NewMessageResource(
 	return resource
 }
 
-func mediaResource(media *domain.Media) *MediaResource {
+func mediaResource(media *domain.Media) *domain.MediaResource {
 	if media == nil {
 		return nil
 	}
-	return &MediaResource{
+	return &domain.MediaResource{
 		ID:              media.ID,
 		Kind:            media.Kind,
 		Status:          media.Status,
@@ -198,11 +177,11 @@ func mediaResource(media *domain.Media) *MediaResource {
 	}
 }
 
-func errorResource(message domain.Message) *ErrorResource {
+func errorResource(message domain.Message) *domain.ErrorResource {
 	if message.ErrorCode == nil {
 		return nil
 	}
-	resource := &ErrorResource{Code: *message.ErrorCode}
+	resource := &domain.ErrorResource{Code: *message.ErrorCode}
 	if message.ErrorMessage != nil {
 		resource.Message = *message.ErrorMessage
 	}
