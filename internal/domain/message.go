@@ -2,10 +2,13 @@ package domain
 
 import (
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
 )
+
+var ErrIdempotencyKeyTaken = errors.New("domain: idempotency key already used in this instance")
 
 const (
 	DirectionInbound  = "inbound"

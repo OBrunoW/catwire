@@ -333,3 +333,21 @@ func TestMessageListPendingForSendHoldsLaterMessagesBehindRetry(t *testing.T) {
 		t.Fatalf("expected second message after first resolved, got %+v", pending)
 	}
 }
+
+func TestMessageListInstancesWithPendingSendIncludesOnlyInstancesWithPendingOutbound(t *testing.T) {
+	fixture := newMessageFixture(t)
+	fixture.insert(t, domain.MessageStatusPending, microsecondsNow())
+	idle := newMessageFixture(t)
+	idle.insert(t, domain.MessageStatusSent, microsecondsNow())
+
+	ids, err := fixture.repository.ListInstancesWithPendingSend(context.Background())
+
+	requireNoError(t, err)
+	found := map[uuid.UUID]bool{}
+	for _, id := range ids {
+		found[id] = true
+	}
+	if !found[fixture.instance.ID] || found[idle.instance.ID] {
+		t.Fatalf("unexpected instances with pending send: %v", ids)
+	}
+}

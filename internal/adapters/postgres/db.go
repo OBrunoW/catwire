@@ -20,7 +20,7 @@ import (
 const uniqueViolationCode = "23505"
 
 var (
-	ErrIdempotencyKeyTaken  = errors.New("postgres: idempotency key already used in this instance")
+	ErrIdempotencyKeyTaken  = domain.ErrIdempotencyKeyTaken
 	ErrChatIdentityConflict = domain.ErrChatIdentityConflict
 )
 

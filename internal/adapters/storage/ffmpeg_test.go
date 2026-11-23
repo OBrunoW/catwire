@@ -31,6 +31,23 @@ func TestFFmpegConverterProducesOggOpus(t *testing.T) {
 	}
 }
 
+func TestFFmpegArgumentsRestrictProtocolsBeforeInput(t *testing.T) {
+	arguments := ffmpegArguments("in", "out")
+
+	whitelist, input := -1, -1
+	for index, argument := range arguments {
+		switch argument {
+		case "-protocol_whitelist":
+			whitelist = index
+		case "-i":
+			input = index
+		}
+	}
+	if whitelist < 0 || input < 0 || whitelist > input || arguments[whitelist+1] != "file,pipe" {
+		t.Fatalf("protocol whitelist must precede -i: %v", arguments)
+	}
+}
+
 func TestFFmpegConverterReportsFailure(t *testing.T) {
 	directory := t.TempDir()
 
