@@ -63,17 +63,6 @@ func TestFetchBlocksPrivateAddressesByDefault(t *testing.T) {
 	}
 }
 
-func TestRejectPrivateAddressBlocksReservedRanges(t *testing.T) {
-	for _, address := range []string{"100.64.0.1:80", "100.127.255.254:80", "0.1.2.3:80", "[64:ff9b::808:808]:80", "127.0.0.1:80"} {
-		if err := rejectPrivateAddress("tcp", address, nil); !errors.Is(err, ErrBlockedAddress) {
-			t.Errorf("%s must be blocked, got %v", address, err)
-		}
-	}
-	if err := rejectPrivateAddress("tcp", "8.8.8.8:80", nil); err != nil {
-		t.Fatalf("public address must pass, got %v", err)
-	}
-}
-
 func TestFetchRejectsUnsupportedScheme(t *testing.T) {
 	fetcher := New(Options{AllowPrivate: true})
 

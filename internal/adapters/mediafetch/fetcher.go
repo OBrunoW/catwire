@@ -8,9 +8,9 @@ import (
 	"net/http"
 	"net/url"
 	"path"
-	"syscall"
 	"time"
 
+	"github.com/OBrunoW/catwire/internal/adapters/netguard"
 	"github.com/OBrunoW/catwire/internal/application/outbound"
 )
 
@@ -20,7 +20,7 @@ const (
 )
 
 var (
-	ErrBlockedAddress = errors.New("mediafetch: destination address is not allowed")
+	ErrBlockedAddress = netguard.ErrBlockedAddress
 	errUnexpected     = errors.New("mediafetch: unexpected response status")
 )
 
@@ -46,9 +46,9 @@ func New(options Options) *Fetcher {
 	}
 	dialer := &net.Dialer{Timeout: timeout}
 	if !options.AllowPrivate {
-		dialer.Control = rejectPrivateAddress
+		dialer.Control = netguard.RejectPrivateAddress
 	}
-	transport := &http.Transport{DialContext: dialer.DialContext, ResponseHeaderTimeout: timeout}
+	transport := &http.Transport{Proxy: nil, DialContext: dialer.DialContext, ResponseHeaderTimeout: timeout}
 	client := &http.Client{
 		Timeout:   timeout,
 		Transport: transport,
@@ -60,45 +60,6 @@ func New(options Options) *Fetcher {
 		},
 	}
 	return &Fetcher{client: client, userAgent: userAgent}
-}
-
-func rejectPrivateAddress(_, address string, _ syscall.RawConn) error {
-	host, _, err := net.SplitHostPort(address)
-	if err != nil {
-		return ErrBlockedAddress
-	}
-	ip := net.ParseIP(host)
-	if ip == nil || isPrivate(ip) {
-		return ErrBlockedAddress
-	}
-	return nil
-}
-
-func isPrivate(ip net.IP) bool {
-	if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() ||
-		ip.IsMulticast() || ip.IsUnspecified() {
-		return true
-	}
-	for _, network := range blockedNetworks {
-		if network.Contains(ip) {
-			return true
-		}
-	}
-	return false
-}
-
-var blockedNetworks = parseNetworks("100.64.0.0/10", "0.0.0.0/8", "64:ff9b::/96")
-
-func parseNetworks(cidrs ...string) []*net.IPNet {
-	networks := make([]*net.IPNet, 0, len(cidrs))
-	for _, cidr := range cidrs {
-		_, network, err := net.ParseCIDR(cidr)
-		if err != nil {
-			panic(err)
-		}
-		networks = append(networks, network)
-	}
-	return networks
 }
 
 func (f *Fetcher) Fetch(ctx context.Context, rawURL string) (outbound.FetchedFile, error) {
