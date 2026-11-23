@@ -2,6 +2,7 @@ package kafka
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -10,14 +11,20 @@ import (
 	"github.com/OBrunoW/catwire/internal/application/outbox"
 )
 
-const batchTimeout = 5 * time.Millisecond
+const (
+	batchTimeout = 5 * time.Millisecond
+	pingTimeout  = 2 * time.Second
+)
+
+var errNoBrokerReachable = errors.New("kafka: no broker reachable")
 
 type Publisher struct {
-	writer *kafkago.Writer
+	writer  *kafkago.Writer
+	brokers []string
 }
 
 func NewPublisher(brokers []string) *Publisher {
-	return &Publisher{writer: &kafkago.Writer{
+	return &Publisher{brokers: brokers, writer: &kafkago.Writer{
 		Addr:                   kafkago.TCP(brokers...),
 		Balancer:               &kafkago.Hash{},
 		RequiredAcks:           kafkago.RequireAll,
@@ -31,6 +38,21 @@ func (p *Publisher) Publish(ctx context.Context, message outbox.Message) error {
 		return fmt.Errorf("kafka write to %s: %w", message.Topic, err)
 	}
 	return nil
+}
+
+func (p *Publisher) Ping(ctx context.Context) error {
+	dialer := &kafkago.Dialer{Timeout: pingTimeout}
+	for _, broker := range p.brokers {
+		connection, err := dialer.DialContext(ctx, "tcp", broker)
+		if err != nil {
+			continue
+		}
+		if err := connection.Close(); err != nil {
+			return fmt.Errorf("kafka close ping connection: %w", err)
+		}
+		return nil
+	}
+	return errNoBrokerReachable
 }
 
 func (p *Publisher) Close() error {
