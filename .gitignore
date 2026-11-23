@@ -1,0 +1,6 @@
+specs/
+.claude/
+CLAUDE.md
+.env
+.env.prod
+.worktrees/
