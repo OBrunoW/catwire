@@ -76,3 +76,22 @@ func (r *InstanceSettingsRepository) Update(ctx context.Context, settings *domai
 	}
 	return nil
 }
+
+func (r *InstanceSettingsRepository) FindByInstanceIDs(ctx context.Context, instanceIDs []uuid.UUID) (map[uuid.UUID]domain.InstanceSettings, error) {
+	rows, err := r.db.Query(ctx,
+		`SELECT `+settingsColumns+` FROM catwire.instance_settings WHERE instance_id = ANY($1)`,
+		orEmptyUUIDs(instanceIDs),
+	)
+	if err != nil {
+		return nil, wrapError("find instance settings by ids", err)
+	}
+	items, err := collect(rows, scanSettings)
+	if err != nil {
+		return nil, wrapError("find instance settings by ids", err)
+	}
+	byInstance := make(map[uuid.UUID]domain.InstanceSettings, len(items))
+	for _, item := range items {
+		byInstance[item.InstanceID] = item
+	}
+	return byInstance, nil
+}
